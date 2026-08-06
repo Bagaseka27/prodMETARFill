@@ -1,0 +1,152 @@
+import sqlite3
+import os
+from auth_utils import hash_password, get_db_path
+
+
+def create_database():
+    # Langsung dapatkan path seragam dari auth_utils!
+    db_path = get_db_path()
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # TABEL Users
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Users (
+        id_user INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL
+    )
+    """)
+
+    # TABEL METAR
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS METAR (
+        id_metar INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_parsing INTEGER, -- Menghubungkan ke tabel Parsing Result
+        id_user INTEGER,    -- Menghubungkan ke pembuat/inputer data
+        raw_metar TEXT NOT NULL,
+        icao TEXT NOT NULL,
+        tanggal_observasi TEXT NOT NULL, -- Format standar: YYYY-MM-DD
+        waktu_observasi TEXT NOT NULL,   -- Format standar: HH:MM (UTC)
+        FOREIGN KEY (id_user) REFERENCES Users(id_user) ON DELETE SET NULL,
+        FOREIGN KEY (id_parsing) REFERENCES Parsing_Result(id_parsing) ON DELETE SET NULL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Parsing_Result (
+        id_parsing INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_metar INTEGER,   -- Relasi balik ke METAR master
+
+        wind_direction TEXT,               -- input#winds-direction
+        wind_speed TEXT,                   -- input#wind_speed
+        wind_gust TEXT,                    -- input#wind_gust
+        wind_dir_min TEXT,                 -- input#winds-wd-dn
+        wind_dir_max TEXT,                 -- input#winds-wd-dx
+        wind_vrb INTEGER DEFAULT 0,        -- checkbox#checkbox-vrb (1 = tercentang, otomatis jika speed > 2 knot)
+
+        visibility_prevailing TEXT,        -- input#input-prevailing
+        visibility_minimum TEXT,           -- input#input-minimum
+
+        vertical_vis TEXT,                 -- input#clouds-vertical-vis
+
+        -- Cuaca Saat Pengamatan (modal "button-weather")
+        weather_intensity TEXT,            -- radio-intensity ("", "-", "+", "VC")
+        weather_descriptor TEXT,           -- radio-descriptor ("", "MI","PR","BC","DR","BL","SH","TS","FZ")
+        weather_precipitation TEXT,        -- radio-precipitation ("DZ","RA","SN","SG","IC","PE","GR","GS","UP")
+        weather_obscuration TEXT,          -- radio-obscuration ("BR","FG","FU","VA","DU","SA","HZ")
+        weather_other TEXT,                -- radio-other ("PO","SQ","FC","SS","DS")
+
+        -- Cuaca yang Lalu
+        recent_weather TEXT,               -- select#recent-w-1
+
+        temperature TEXT,                  -- input#v-air-temp
+        dewpoint TEXT,                     -- input#v-dew-point
+        pressure TEXT,                     -- input#v-presure
+
+        trend TEXT,                        -- select[data-v-1010a25b]#input-type (Trend)
+
+        FOREIGN KEY (id_metar) REFERENCES METAR(id_metar) ON DELETE CASCADE
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Awan (
+        id_awan INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_parsing INTEGER NOT NULL,
+        urutan INTEGER NOT NULL,           -- 1, 2, atau 3 (maksimal 3 record)
+        cloud_amount TEXT,                 -- select#clouds-jumlah (FEW, SCT, BKN, OVC)
+        cloud_height TEXT,                 -- input#cloud_height
+        cloud_type TEXT,                   -- select#select-type (CB, TCU)
+        FOREIGN KEY (id_parsing) REFERENCES Parsing_Result(id_parsing) ON DELETE CASCADE
+    )
+    """)
+
+    # TABEL AutoFill History
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS AutoFill_History (
+        id_history INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_user INTEGER,
+        id_metar INTEGER,
+        waktu_send TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status TEXT NOT NULL, -- Contoh: "SUKSES", "GAGAL", "PENDING"
+        FOREIGN KEY (id_user) REFERENCES Users(id_user) ON DELETE SET NULL,
+        FOREIGN KEY (id_metar) REFERENCES METAR(id_metar) ON DELETE SET NULL
+    )
+    """)
+
+    # User admin default -> password di-hash, JANGAN disimpan plain text
+    cursor.execute(
+        "INSERT OR IGNORE INTO Users (nama, password, role) VALUES (?, ?, ?)",
+        ("admin", hash_password("admin123"), "Admin"),
+    )
+
+    conn.commit()
+    conn.close()
+    print("Sukses! Seluruh struktur tabel dan relasi ERD berhasil dibuat.")
+
+    bersihkan_data_lama()
+
+def bersihkan_data_lama():
+    try:
+        db_path = get_db_path()
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 1. Menghapus data METAR yang tanggal_observasinya lebih dari 30 hari
+        cursor.execute("""
+            DELETE FROM METAR 
+            WHERE tanggal_observasi < date('now', '-30 days')
+        """)
+        
+        # 2. Membersihkan tabel Awan
+        cursor.execute("""
+            DELETE FROM Awan 
+            WHERE id_parsing NOT IN (SELECT id_parsing FROM Parsing_Result)
+        """)
+        
+        # 3. Membersihkan tabel Parsing_Result
+        cursor.execute("""
+            DELETE FROM Parsing_Result 
+            WHERE id_metar IS NULL 
+            OR id_metar NOT IN (SELECT id_metar FROM METAR)
+        """)
+        
+        # 4. Membersihkan tabel AutoFill_History
+        cursor.execute("""
+            DELETE FROM AutoFill_History 
+            WHERE id_metar IS NOT NULL 
+            AND id_metar NOT IN (SELECT id_metar FROM METAR)
+        """)
+        
+        conn.commit()
+        conn.close()
+        print("Pembersihan data lama (> 30 hari) berhasil dilakukan.")
+    except Exception as e:
+        # Menangkap error jika tabel belum siap/kosong tanpa menghentikan aplikasi
+        print(f"Peringatan pembersihan data diskipped: {e}")
+
+if __name__ == "__main__":
+    create_database()
