@@ -15,6 +15,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "dist\METARFILL\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "METARFill_Logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\METARFill BMKG"; Filename: "{app}\METARFill.exe"; IconFilename: "{app}\METARFill_Logo.ico"

@@ -185,12 +185,39 @@ class DashboardApp(QMainWindow):
         self.card_sesi.setStyleSheet("background-color: #B58D47; border-radius: 12px; border: none;") 
         layout_c2 = QVBoxLayout(self.card_sesi)
         layout_c2.setContentsMargins(15, 12, 15, 12)
+
         lbl_c2_title = QLabel("Sesi Login Aktif")
         lbl_c2_title.setStyleSheet("color: #E2E2E2; font-weight: bold; font-size: 11px;")
+
+        # Layout horizontal untuk Status | Timer (Ukuran Seragam)
+        status_timer_layout = QHBoxLayout()
+        status_timer_layout.setSpacing(8)
+
+        # Label Status (misal: Aktif / Kadaluarsa / Kosong)
         self.lbl_status_sesi = QLabel("Memeriksa...") 
-        self.lbl_status_sesi.setStyleSheet("color: white; font-weight: bold; font-size: 26px; margin-top: 5px;")
+        self.lbl_status_sesi.setStyleSheet("color: white; font-weight: bold; font-size: 26px;")
+
+        # Label Separator (|)
+        self.lbl_separator = QLabel("|")
+        self.lbl_separator.setStyleSheet("color: #E2E2E2; font-size: 26px; font-weight: 300;")
+        self.lbl_separator.hide() # Sembunyikan awal sebelum ada timer
+
+        # Label Timer Countdown (HH:MM:SS)
+        self.lbl_timer_sesi = QLabel("")
+        self.lbl_timer_sesi.setStyleSheet("color: white; font-size: 26px; font-weight: bold;")
+
+        status_timer_layout.addWidget(self.lbl_status_sesi)
+        status_timer_layout.addWidget(self.lbl_separator)
+        status_timer_layout.addWidget(self.lbl_timer_sesi)
+        status_timer_layout.addStretch()
+
         layout_c2.addWidget(lbl_c2_title)
-        layout_c2.addWidget(self.lbl_status_sesi)
+        layout_c2.addLayout(status_timer_layout)
+
+        # Timer Qt untuk refresh setiap detik
+        self.timer_countdown = QTimer(self)
+        self.timer_countdown.timeout.connect(self.update_info_status_sesi)
+        self.timer_countdown.start(1000)
 
         # --- KARTU KANAN (JUMLAH DATA) ---
         card_jumlah = QFrame()
@@ -441,6 +468,11 @@ class DashboardApp(QMainWindow):
         self.menu_group.idClicked.connect(self.handle_menu_click)
         btn_ambil_data.clicked.connect(self.ambil_data_tanggal)
         self.update_info_status_sesi()
+
+        # Saat pertama kali dashboard dibuka, langsung ambil data dari web-aviation.bmkg.go.id
+        idx_web_aviation = self.combo_sumber_data.findData(SUMBER_WEB_AVIATION)
+        if idx_web_aviation != -1:
+            self.combo_sumber_data.setCurrentIndex(idx_web_aviation)
         QTimer.singleShot(0, self.ambil_data_tanggal)
 
     def load_data_to_table(self, tanggal_filter=None):
@@ -681,7 +713,7 @@ class DashboardApp(QMainWindow):
         )
 
         self.session_worker = SessionUpdateWorker()
-        self.session_worker.selesai.connect(self.on_sesi_login_selesai)
+        self.session_worker.selesai.connect(self.handle_sesi_selesai)
         self.session_worker.start()
 
     def handle_sesi_selesai(self, sukses, pesan):
@@ -700,20 +732,73 @@ class DashboardApp(QMainWindow):
 
     def update_info_status_sesi(self):
         import os
+        import json
+        import base64
         from datetime import datetime
-        
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        auth_path = os.path.join(current_dir, "auth_state.json")
-        
+        from auth_utils import get_auth_state_path
+
+        auth_path = get_auth_state_path()
+
         if os.path.exists(auth_path):
-            timestamp = os.path.getmtime(auth_path)
-            waktu_modifikasi = datetime.fromtimestamp(timestamp)
-            
-            self.lbl_status_sesi.setText("Aktif")
-            self.lbl_status_sesi.setStyleSheet("color: #FFFFFF; font-size: 24px; font-weight: bold;")
+            try:
+                with open(auth_path, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+
+                access_token = None
+                for origin in state.get("origins", []):
+                    for item in origin.get("localStorage", []):
+                        if item.get("name") == "accessToken":
+                            access_token = item.get("value")
+                            break
+                    if access_token:
+                        break
+
+                if access_token:
+                    payload_b64 = access_token.split('.')[1]
+                    payload_b64 += '=' * (-len(payload_b64) % 4)
+                    payload_data = json.loads(base64.b64decode(payload_b64).decode('utf-8'))
+                    
+                    exp_timestamp = payload_data.get('exp')
+                    
+                    if exp_timestamp:
+                        sekarang = int(datetime.now().timestamp())
+                        sisa_detik = exp_timestamp - sekarang
+
+                        if sisa_detik > 0:
+                            jam = sisa_detik // 3600
+                            menit = (sisa_detik % 3600) // 60
+                            detik = sisa_detik % 60
+                            
+                            self.lbl_status_sesi.setText("Aktif")
+                            self.lbl_status_sesi.setStyleSheet("color: #FFFFFF; font-size: 26px; font-weight: bold;")
+                            
+                            # Format HH:MM:SS murni tanpa tanda kurung
+                            self.lbl_timer_sesi.setText(f"{jam:02d}:{menit:02d}:{detik:02d}")
+                            self.lbl_separator.show()
+                        else:
+                            self.lbl_status_sesi.setText("Kadaluarsa")
+                            self.lbl_status_sesi.setStyleSheet("color: #FFD2D2; font-size: 26px; font-weight: bold;")
+                            self.lbl_timer_sesi.setText("00:00:00")
+                            self.lbl_separator.show()
+                    else:
+                        self.lbl_status_sesi.setText("Aktif")
+                        self.lbl_timer_sesi.setText("")
+                        self.lbl_separator.hide()
+                else:
+                    self.lbl_status_sesi.setText("Kosong")
+                    self.lbl_status_sesi.setStyleSheet("color: #FFD2D2; font-size: 26px; font-weight: bold;")
+                    self.lbl_timer_sesi.setText("")
+                    self.lbl_separator.hide()
+            except Exception:
+                self.lbl_status_sesi.setText("Aktif")
+                self.lbl_status_sesi.setStyleSheet("color: #FFFFFF; font-size: 26px; font-weight: bold;")
+                self.lbl_timer_sesi.setText("")
+                self.lbl_separator.hide()
         else:
             self.lbl_status_sesi.setText("Kosong")
-            self.lbl_status_sesi.setStyleSheet("color: #FFD2D2; font-size: 24px; font-weight: bold;")
+            self.lbl_status_sesi.setStyleSheet("color: #FFD2D2; font-size: 26px; font-weight: bold;")
+            self.lbl_timer_sesi.setText("")
+            self.lbl_separator.hide()
 
     def update_info_cards_from_db(self):
         try:

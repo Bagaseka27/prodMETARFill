@@ -118,12 +118,6 @@ def _ambil_token_web_aviation():
 
 
 def ambil_data_metar_web_aviation(tahun, bulan, tanggal, stasiun="WARD"):
-    """Mengambil data METAR dari web-aviation.bmkg.go.id/web/metar_speci.php
-    untuk satu hari penuh (00:00 s.d. 23:59 UTC) pada stasiun tertentu.
-    Mengembalikan DataFrame dengan kolom yang sama seperti
-    ambil_data_metar_bmkg agar bisa dipakai oleh proses_data_untuk_tanggal
-    tanpa perubahan lebih lanjut."""
-
     tanggal_str = str(tanggal).zfill(2)
     bulan_str = str(bulan).zfill(2)
     tahun_str = str(tahun)
@@ -367,6 +361,14 @@ def parse_metar(line, tahun=None, bulan=None):
         hasil["pressure"] = "9999"
 
     hasil.update(ekstrak_cuaca(metar_code))
+
+    hasil["trend"] = "NOSIG"  # Nilai default jika tidak ada
+    if "NOSIG" in metar_code:
+        hasil["trend"] = "NOSIG"
+    elif "BECMG" in metar_code:
+        hasil["trend"] = "BECMG"
+    elif "TEMPO" in metar_code:
+        hasil["trend"] = "TEMPO"
 
     return hasil
 

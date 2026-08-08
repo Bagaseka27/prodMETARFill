@@ -4,6 +4,7 @@ import time
 import threading
 import queue
 from playwright.sync_api import sync_playwright
+
 from auth_utils import get_auth_state_path
 
 
@@ -95,21 +96,27 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
             try:
                 browser = p.chromium.launch(headless=False, channel="chrome")
+                # 'disconnected' baru terpicu setelah SELURUH proses browser mati total,
+                # ini bisa lambat. Tambahkan juga listener di context & page yang
+                # terpicu jauh lebih cepat begitu window/tab ditutup oleh observer.
                 browser.on("disconnected", lambda: ditutup_manual.set())
-
-                auth_state_path = get_auth_state_path()
-                if not os.path.exists(auth_state_path):
-                    raise Exception(
-                        f"File sesi login tidak ditemukan di '{auth_state_path}'. "
-                        "Silakan klik 'Perbarui Sesi Login' terlebih dahulu."
-                    )
-                context = browser.new_context(storage_state=auth_state_path)
+                auth_path = get_auth_state_path()
+                context = browser.new_context(storage_state=auth_path)
                 context.on("close", lambda: ditutup_manual.set())
 
                 page = context.new_page()
                 page.on("close", lambda _: ditutup_manual.set())
                 page.set_default_timeout(60000)
 
+                # PENTING: begitu observer menutup window secara manual (klik X),
+                # banyak web form (kemungkinan termasuk BMKGSatu) punya listener
+                # 'beforeunload' yang memicu dialog konfirmasi native "Leave site?".
+                # Selama dialog itu belum dijawab, browser TIDAK benar-benar
+                # tertutup -> event 'disconnected'/'close' juga ikut nyangkut,
+                # itulah gap lama yang cuma muncul di penutupan manual (bukan
+                # penutupan otomatis lewat browser.close() kita sendiri, yang
+                # memang bypass dialog semacam ini). Auto-accept semua dialog
+                # supaya window langsung benar-benar tertutup tanpa menunggu.
                 page.on("dialog", lambda dialog: dialog.accept())
 
                 print("Membuka halaman form...")
@@ -179,22 +186,6 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 page.wait_for_selector("#input-icao")
                 nilai_icao = page.locator("#input-icao").input_value()
                 print(f"-> Kode ICAO otomatis terisi: '{nilai_icao}'")
-
-                # =========================================================
-                # [*] KELOMPOK DROPDOWN: TREND
-                # =========================================================
-                print("\n[*] Mengisi Trend...")
-                target_trend = "NOSIG"
-                page.wait_for_selector("select[data-v-1010a25b]#input-type", state="attached")
-                page.evaluate(f"""() => {{
-                    const trendSelect = document.querySelector('select[data-v-1010a25b]#input-type');
-                    if (trendSelect) {{
-                        trendSelect.value = '{target_trend}';
-                        trendSelect.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        trendSelect.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    }}
-                }}""")
-                print(f"-> Trend Berhasil dipaksa set ke '{target_trend}'!")
 
                 # 🛑 TUNGGU SELURUH PROSES FETCHING / RESET DARI WEB SELESAI TOTAL 🛑
                 print("Menunggu web selesai mengambil data cuaca & mereset form...")
@@ -392,6 +383,22 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                     page.select_option("#recent-w-1", value=recent_weather)
 
                 time.sleep(1)
+
+                # =========================================================
+                # [*] KELOMPOK DROPDOWN: TREND
+                # =========================================================
+                print("\n[*] Mengisi Trend...")
+                target_trend = "NOSIG"
+                page.wait_for_selector("select[data-v-1010a25b]#input-type", state="attached")
+                page.evaluate(f"""() => {{
+                    const trendSelect = document.querySelector('select[data-v-1010a25b]#input-type');
+                    if (trendSelect) {{
+                        trendSelect.value = '{target_trend}';
+                        trendSelect.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        trendSelect.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    }}
+                }}""")
+                print(f"-> Trend Berhasil dipaksa set ke '{target_trend}'!")
 
                 # =========================================================
                 # 12. URUTAN 12: BLOK AWAN (MAKSIMAL 3 RECORD)
