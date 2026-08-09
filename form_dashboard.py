@@ -174,7 +174,6 @@ class DashboardApp(QMainWindow):
         lbl_c1_title = QLabel("Data Terakhir (Jam) Hari Ini")
         lbl_c1_title.setStyleSheet("color: #E2E2E2; font-weight: bold; font-size: 11px;")
         
-        # PERBAIKAN: Menggunakan self. agar bisa di-update dari database
         self.lbl_data_terakhir = QLabel("-- : --")
         self.lbl_data_terakhir.setStyleSheet("color: white; font-weight: bold; font-size: 26px; margin-top: 5px;")
         layout_c1.addWidget(lbl_c1_title)
@@ -189,20 +188,16 @@ class DashboardApp(QMainWindow):
         lbl_c2_title = QLabel("Sesi Login Aktif")
         lbl_c2_title.setStyleSheet("color: #E2E2E2; font-weight: bold; font-size: 11px;")
 
-        # Layout horizontal untuk Status | Timer (Ukuran Seragam)
         status_timer_layout = QHBoxLayout()
         status_timer_layout.setSpacing(8)
 
-        # Label Status (misal: Aktif / Kadaluarsa / Kosong)
         self.lbl_status_sesi = QLabel("Memeriksa...") 
         self.lbl_status_sesi.setStyleSheet("color: white; font-weight: bold; font-size: 26px;")
 
-        # Label Separator (|)
         self.lbl_separator = QLabel("|")
         self.lbl_separator.setStyleSheet("color: #E2E2E2; font-size: 26px; font-weight: 300;")
-        self.lbl_separator.hide() # Sembunyikan awal sebelum ada timer
+        self.lbl_separator.hide() 
 
-        # Label Timer Countdown (HH:MM:SS)
         self.lbl_timer_sesi = QLabel("")
         self.lbl_timer_sesi.setStyleSheet("color: white; font-size: 26px; font-weight: bold;")
 
@@ -214,7 +209,6 @@ class DashboardApp(QMainWindow):
         layout_c2.addWidget(lbl_c2_title)
         layout_c2.addLayout(status_timer_layout)
 
-        # Timer Qt untuk refresh setiap detik
         self.timer_countdown = QTimer(self)
         self.timer_countdown.timeout.connect(self.update_info_status_sesi)
         self.timer_countdown.start(1000)
@@ -248,7 +242,7 @@ class DashboardApp(QMainWindow):
         table_title.setStyleSheet("""
             QLabel {
                 color: #000000; 
-                margin-top: 15px; /* Menyelaraskan jarak dari kartu di atasnya */
+                margin-top: 15px;
             }
         """)
         self.input_ambil_data = QDateEdit()
@@ -305,7 +299,7 @@ class DashboardApp(QMainWindow):
         if kalender_popup:
             kalender_popup.setStyleSheet("""
                 QCalendarWidget QWidget {
-                    color: black; /* Memaksa semua teks di dalam kalender berwarna hitam */
+                    color: black;
                     background-color: white;
                 }
                 QCalendarWidget QMenu {
@@ -328,7 +322,6 @@ class DashboardApp(QMainWindow):
                 }
             """)
         
-# --- SWITCH SUMBER DATA (aviation.bmkg.go.id / web-aviation.bmkg.go.id) ---
         self.combo_sumber_data = QComboBox()
         self.combo_sumber_data.addItem("Sumber: aviation.bmkg.go.id", SUMBER_AVIATION_LAMA)
         self.combo_sumber_data.addItem("Sumber: web-aviation.bmkg.go.id", SUMBER_WEB_AVIATION)        
@@ -340,13 +333,12 @@ class DashboardApp(QMainWindow):
                 padding: 6px 10px;
                 background-color: white;
                 color: black;
-                font-size: 15px; /* Disamakan dengan QDateEdit (sebelumnya 13px) */
+                font-size: 15px;
                 font-weight: bold;
                 min-height: 35px;
                 max-height: 35px;
                 margin-top: 15px;
             }
-            /* Styling untuk kotak panah di sebelah kanan */
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
@@ -361,7 +353,6 @@ class DashboardApp(QMainWindow):
             QComboBox::drop-down:hover {
                 background-color: #E0E8F5;
             }
-            /* Styling untuk ikon segitiga panah */
             QComboBox::down-arrow {
                 image: none;
                 width: 0px;
@@ -370,11 +361,10 @@ class DashboardApp(QMainWindow):
                 border-width: 5px 4px 0 4px;
                 border-color: #555555 transparent transparent transparent;
             }
-            /* Styling untuk list pilihan saat diklik */
             QComboBox QAbstractItemView {
                 background-color: white;
                 color: black;
-                selection-background-color: #0070C0; /* Disamakan dengan tema biru tombol/kalender */
+                selection-background-color: #0070C0;
                 selection-color: white;
                 border: 1px solid #A0A0A0;
             }
@@ -399,7 +389,6 @@ class DashboardApp(QMainWindow):
             QPushButton:hover { background-color: #0000CD; }
         """)
         
-        # Menyusun urutan elemen dari kiri ke kanan
         input_button_layout.addWidget(table_title)
         input_button_layout.addWidget(self.input_ambil_data, 1) 
         input_button_layout.addWidget(self.combo_sumber_data)
@@ -407,10 +396,11 @@ class DashboardApp(QMainWindow):
         
         content_layout.addLayout(input_button_layout)
 
+        # MODIFIKASI: Mengubah jumlah kolom menjadi 8 dan menghapus header "ID METAR"
         self.table_widget = QTableWidget()
-        self.table_widget.setColumnCount(9)
+        self.table_widget.setColumnCount(8)
         self.table_widget.setHorizontalHeaderLabels([
-            "Waktu", "Arah Angin", "Kecepatan", "Visibility", "Tinggi Awan", "Temp", "Embun", "ID METAR", "Aksi"
+            "Waktu", "Arah Angin", "Kecepatan", "Visibility", "Tinggi Awan", "Temp", "Embun", "Aksi"
         ])
         
         self.table_widget.setSelectionMode(QAbstractItemView.NoSelection)
@@ -469,7 +459,6 @@ class DashboardApp(QMainWindow):
         btn_ambil_data.clicked.connect(self.ambil_data_tanggal)
         self.update_info_status_sesi()
 
-        # Saat pertama kali dashboard dibuka, langsung ambil data dari web-aviation.bmkg.go.id
         idx_web_aviation = self.combo_sumber_data.findData(SUMBER_WEB_AVIATION)
         if idx_web_aviation != -1:
             self.combo_sumber_data.setCurrentIndex(idx_web_aviation)
@@ -509,21 +498,25 @@ class DashboardApp(QMainWindow):
         # Bersihkan tabel sebelum mengisi
         self.table_widget.setRowCount(0)
         
+        # MODIFIKASI: Menyusun data ke tabel tanpa menampilkan ID METAR
         for row_data in rows:
             row_idx = self.table_widget.rowCount()
             self.table_widget.insertRow(row_idx)
             
-            # Memasukkan setiap kolom ke tabel
-            for col_idx, data in enumerate(row_data):
+            # Ambil data tampilan (7 kolom awal: Waktu s/d Embun)
+            display_data = row_data[:7]
+            id_metar = row_data[7]
+            
+            for col_idx, data in enumerate(display_data):
                 item = QTableWidgetItem(str(data))
                 item.setTextAlignment(Qt.AlignCenter) 
                 self.table_widget.setItem(row_idx, col_idx, item)
             
-            # Menambahkan tombol "Detail" di kolom terakhir (Aksi)
+            # Tombol "Detail" diletakkan pada kolom ke-8 (indeks 7) dan tetap memanggil id_metar
             btn_detail = QPushButton("Detail")
             btn_detail.setStyleSheet("background-color: #0070C0; color: white; border-radius: 4px;")
-            btn_detail.clicked.connect(lambda checked, data=row_data: self.buka_form_input(data[-1])) 
-            self.table_widget.setCellWidget(row_idx, 8, btn_detail) 
+            btn_detail.clicked.connect(lambda checked, target_id=id_metar: self.buka_form_input(target_id)) 
+            self.table_widget.setCellWidget(row_idx, 7, btn_detail) 
 
     def tampilkan_pesan(self, judul, pesan, jenis="info"):
         msg = QMessageBox(self)
@@ -549,7 +542,7 @@ class DashboardApp(QMainWindow):
         self._msg_loading.button(QMessageBox.Close).setText("Tutup")
         self._msg_loading.setStyleSheet("QLabel{color: black;} QPushButton{color: black;}")
         self._msg_loading.show()
-        QApplication.processEvents()  # paksa Qt menggambar messagebox sebelum kerja berat dimulai
+        QApplication.processEvents()
 
     def _tutup_loading(self):
         if getattr(self, "_msg_loading", None) is not None:
@@ -690,7 +683,6 @@ class DashboardApp(QMainWindow):
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
-            # Hapus data yang lebih lama dari 30 hari
             cursor.execute("DELETE FROM METAR WHERE tanggal_observasi < date('now', '-30 days')")
             cursor.execute("DELETE FROM Awan WHERE id_parsing NOT IN (SELECT id_parsing FROM Parsing_Result)")
             cursor.execute("DELETE FROM Parsing_Result WHERE id_metar IS NULL OR id_metar NOT IN (SELECT id_metar FROM METAR)")
@@ -772,7 +764,6 @@ class DashboardApp(QMainWindow):
                             self.lbl_status_sesi.setText("Aktif")
                             self.lbl_status_sesi.setStyleSheet("color: #FFFFFF; font-size: 26px; font-weight: bold;")
                             
-                            # Format HH:MM:SS murni tanpa tanda kurung
                             self.lbl_timer_sesi.setText(f"{jam:02d}:{menit:02d}:{detik:02d}")
                             self.lbl_separator.show()
                         else:
@@ -808,10 +799,6 @@ class DashboardApp(QMainWindow):
             now = datetime.now()
             current_month_year = now.strftime("%Y-%m")
 
-            # query = "SELECT COUNT(*) FROM METAR WHERE strftime('%Y-%m', tanggal_observasi) = ?"
-            # cursor.execute(query, (current_month_year,))
-            # total_data_bulan_ini = cursor.fetchone()[0]
-            # self.lbl_jumlah_data.setText(str(total_data_bulan_ini))
             cursor.execute("SELECT COUNT(*) FROM METAR")
             total_data = cursor.fetchone()[0]
             self.lbl_jumlah_data.setText(str(total_data))

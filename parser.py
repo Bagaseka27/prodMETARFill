@@ -118,6 +118,12 @@ def _ambil_token_web_aviation():
 
 
 def ambil_data_metar_web_aviation(tahun, bulan, tanggal, stasiun="WARD"):
+    """Mengambil data METAR dari web-aviation.bmkg.go.id/web/metar_speci.php
+    untuk satu hari penuh (00:00 s.d. 23:59 UTC) pada stasiun tertentu.
+    Mengembalikan DataFrame dengan kolom yang sama seperti
+    ambil_data_metar_bmkg agar bisa dipakai oleh proses_data_untuk_tanggal
+    tanpa perubahan lebih lanjut."""
+
     tanggal_str = str(tanggal).zfill(2)
     bulan_str = str(bulan).zfill(2)
     tahun_str = str(tahun)
@@ -161,7 +167,8 @@ def ambil_data_metar_web_aviation(tahun, bulan, tanggal, stasiun="WARD"):
         print(" [Info] Tidak ada tbody pada tabel hasil web-aviation.")
         return None
 
-    records = []
+   
+    records_dict = {}
     for baris in tbody.find_all('tr'):
         kolom = baris.find_all('td')
         if len(kolom) < 4:
@@ -170,13 +177,16 @@ def ambil_data_metar_web_aviation(tahun, bulan, tanggal, stasiun="WARD"):
         data_metar = kolom[0].get_text(strip=True)
         waktu_observasi = kolom[3].get_text(strip=True)
 
-        # Hanya proses baris METAR; baris SPECI sengaja dilewati di sini
-        # supaya tidak ikut terhitung sebagai "gagal_parse" oleh parse_metar
-        # (yang memang hanya mengenali baris berisi kata "METAR").
         if "METAR" not in data_metar:
             continue
 
-        records.append([waktu_observasi, data_metar])
+        # Jika jam tersebut belum ada, atau data baru ini mengandung kata "COR", 
+        # maka timpa/simpan sebagai data yang diprioritaskan.
+        if waktu_observasi not in records_dict or "COR" in data_metar:
+            records_dict[waktu_observasi] = data_metar
+
+    # Konversi kembali dictionary ke bentuk list records
+    records = [[waktu, metar] for waktu, metar in records_dict.items()]
 
     if not records:
         print(f" [Info] Tidak ditemukan data METAR untuk stasiun {stasiun} "
@@ -192,7 +202,6 @@ def ambil_data_metar_web_aviation(tahun, bulan, tanggal, stasiun="WARD"):
 # Sumber data yang tersedia untuk dipilih dari dashboard.
 SUMBER_AVIATION_LAMA = "aviation"        # aviation.bmkg.go.id
 SUMBER_WEB_AVIATION = "web_aviation"     # web-aviation.bmkg.go.id
-
 
 def ambil_data_metar(tahun, bulan, tanggal, sumber=SUMBER_AVIATION_LAMA, stasiun="WARD"):
     """Dispatcher: mengambil data METAR dari sumber yang dipilih."""
