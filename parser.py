@@ -371,7 +371,7 @@ def parse_metar(line, tahun=None, bulan=None):
 
     hasil.update(ekstrak_cuaca(metar_code))
 
-    hasil["trend"] = "NOSIG"  # Nilai default jika tidak ada
+    hasil["trend"] = "NOSIG"  
     if "NOSIG" in metar_code:
         hasil["trend"] = "NOSIG"
     elif "BECMG" in metar_code:

@@ -108,24 +108,14 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 page.on("close", lambda _: ditutup_manual.set())
                 page.set_default_timeout(60000)
 
-                # PENTING: begitu observer menutup window secara manual (klik X),
-                # banyak web form (kemungkinan termasuk BMKGSatu) punya listener
-                # 'beforeunload' yang memicu dialog konfirmasi native "Leave site?".
-                # Selama dialog itu belum dijawab, browser TIDAK benar-benar
-                # tertutup -> event 'disconnected'/'close' juga ikut nyangkut,
-                # itulah gap lama yang cuma muncul di penutupan manual (bukan
-                # penutupan otomatis lewat browser.close() kita sendiri, yang
-                # memang bypass dialog semacam ini). Auto-accept semua dialog
-                # supaya window langsung benar-benar tertutup tanpa menunggu.
+         
                 page.on("dialog", lambda dialog: dialog.accept())
 
                 print("Membuka halaman form...")
                 url = "https://bmkgsatu.bmkg.go.id/meteorologi/metarspeci"
                 page.goto(url, wait_until="commit")
 
-                # =========================================================
-                # 1. URUTAN 1: ISI WMO ID
-                # =========================================================
+                # 1. ISI WMO ID
                 print("\n[1] Mengisi WMO ID...")
                 wmo_target = "96929"
                 wmo_container = page.locator("div.form-group:has(label:has-text('WMO ID'))")
@@ -139,20 +129,18 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 wmo_option.click()
                 print("-> WMO ID Berhasil dipilih!")
 
-                # Tunggu indikator loading bawaan stasiun selesai
+                # loading
                 page.wait_for_selector(".vs__spinner", state="hidden")
                 time.sleep(2)
 
-                # =========================================================
-                # 2. URUTAN 2: ISI NAMA OBSERVER
-                # =========================================================
+                # 2. ISI NAMA OBSERVER
                 print("\n[2] Mengisi Nama Observer...")
                 observer_container = page.locator("div.form-group:has(label:has-text('Nama Observer'))")
 
                 observer_search = observer_container.locator(".vs__search")
 
                 observer_search.click()
-                observer_search.fill("")  # Bersihkan dulu
+                observer_search.fill("")
                 observer_search.fill(nama_observer)
 
                 observer_option = observer_container.locator("ul[role='listbox'] li")
@@ -168,9 +156,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # 3. URUTAN 3: ISI FIELD TYPE (METAR/SPECI)
-                # =========================================================
+                # 3. ISI FIELD TYPE (METAR/SPECI)
                 print("\n[3] Mengisi Field Type...")
                 page.wait_for_selector("select[data-v-09a7bfae]#input-type")
                 type_target = "METAR"
@@ -179,22 +165,16 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # 4. URUTAN 4: VERIFIKASI FIELD ICAO
-                # =========================================================
+                # 4.FIELD ICAO
                 print("\n[4] Memeriksa nilai otomatis ICAO...")
                 page.wait_for_selector("#input-icao")
                 nilai_icao = page.locator("#input-icao").input_value()
                 print(f"-> Kode ICAO otomatis terisi: '{nilai_icao}'")
 
-                # 🛑 TUNGGU SELURUH PROSES FETCHING / RESET DARI WEB SELESAI TOTAL 🛑
-                print("Menunggu web selesai mengambil data cuaca & mereset form...")
                 page.wait_for_selector(".vs__spinner", state="hidden")
                 time.sleep(3)
 
-                # =========================================================
-                # 5. URUTAN 5: ISI TANGGAL (SETELAH RESET WEB SELESAI)
-                # =========================================================
+                # 5. ISI TANGGAL
                 raw_date = data_cuaca.get('full_date', '')
 
                 if raw_date and "-" in raw_date:
@@ -209,7 +189,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 dp_input.click()
                 time.sleep(0.5)
 
-                # Paksa kalender render bulan target
+                # render bulan target
                 page.evaluate(f"""(targetIso) => {{
                     const input = document.querySelector('#datepicker');
                     if (input) {{
@@ -222,7 +202,6 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 }}""", iso_date)
                 time.sleep(0.5)
 
-                # Klik cell tanggal pada popup kalender
                 target_cell = page.locator(f"[data-date='{iso_date}']").first
                 if target_cell.count() > 0:
                     target_cell.click(force=True)
@@ -242,11 +221,9 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                         }}
                     }}""", iso_date)
 
-                time.sleep(1.5)  # Beri jeda kecil setelah ubah tanggal
+                time.sleep(1.5)  
 
-                # =========================================================
-                # 6 & 7. URUTAN 6 & 7: ISI JAM & MENIT
-                # =========================================================
+                # 6 & 7 ISI JAM & MENIT
                 print(f"\n[6 & 7] Mengisi Jam: {data_cuaca['hour']}, Menit: {data_cuaca['minute']}...")
 
                 page.wait_for_selector("#input-jam")
@@ -266,9 +243,8 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                     pass
                 time.sleep(2)
 
-                # =========================================================
-                # 8. URUTAN 8: SINKRONISASI DATA ANGIN, VISIBILITY, SUHU, TEKANAN
-                # =========================================================
+        
+                # 8. DATA ANGIN, VISIBILITY, SUHU, TEKANAN
                 print(f"\n[8] Menginjeksi data angin/visibility/suhu/tekanan: {data_cuaca}")
                 page.evaluate("""(data) => {
                     const triggerEvent = (el) => {
@@ -303,9 +279,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # 9. URUTAN 9: CHECKBOX VRB
-                # =========================================================
+                # 9. CHECKBOX VRB
                 print("\n[9] Mengatur kondisi VRB...")
                 vrb_harus_dicentang = bool(data_cuaca.get('is_vrb', False))
 
@@ -327,9 +301,9 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # 9b. URUTAN 9b: CHECKBOX STATUS LAPORAN (COR / NIL / AUTO)
-                # =========================================================
+
+                # CHECKBOX STATUS LAPORAN (COR / NIL / AUTO)
+
                 print("\n[9b] Mengatur checkbox status laporan (COR/NIL/AUTO)...")
 
                 def _centang_checkbox_status(elemen_id, aktif, label):
@@ -347,9 +321,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # 10. URUTAN 10: BLOK CUACA SAAT PENGAMATAN (MODAL)
-                # =========================================================
+                # 10. BLOK CUACA SAAT PENGAMATAN (MODAL)
                 print("\n[10] Mengisi Blok Cuaca Saat Pengamatan...")
                 ada_data_cuaca_saat_ini = any(
                     data_cuaca.get(k) is not None
@@ -373,9 +345,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                         tutup_modal_cuaca(page)
                     time.sleep(1)
 
-                # =========================================================
-                # 11. URUTAN 11: BLOK CUACA YANG LALU
-                # =========================================================
+                # 11.BLOK CUACA YANG LALU
                 recent_weather = data_cuaca.get("recent_weather")
                 if recent_weather is not None:
                     print(f"\n[11] Mengisi Cuaca yang Lalu: '{recent_weather}'...")
@@ -384,9 +354,8 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                 time.sleep(1)
 
-                # =========================================================
-                # [*] KELOMPOK DROPDOWN: TREND
-                # =========================================================
+
+                #TREND
                 print("\n[*] Mengisi Trend...")
                 target_trend = "NOSIG"
                 page.wait_for_selector("select[data-v-1010a25b]#input-type", state="attached")
@@ -400,9 +369,7 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
                 }}""")
                 print(f"-> Trend Berhasil dipaksa set ke '{target_trend}'!")
 
-                # =========================================================
-                # 12. URUTAN 12: BLOK AWAN (MAKSIMAL 3 RECORD)
-                # =========================================================
+                # 12. BLOK AWAN (MAKSIMAL 3 RECORD)
                 daftar_awan = data_cuaca.get("clouds", [])[:3]
                 print(f"\n[12] Mengisi Blok Awan ({len(daftar_awan)} record)...")
 
@@ -445,10 +412,8 @@ def run_test(data_cuaca, nama_observer, event_selesai_manual=None):
 
                     time.sleep(1)
 
-                # =========================================================
-                # 9c. RE-VERIFIKASI CHECKBOX VRB SEBELUM SUBMIT
-                # =========================================================
-                print("\n[9c] Memastikan ulang status checkbox VRB sebelum submit...")
+                # 9c. RE-VERIFIKASI CHECKBOX VRB
+            
                 _set_checkbox_vrb(vrb_harus_dicentang)
 
                 print("-> Injeksi data selesai.")

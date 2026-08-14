@@ -2,7 +2,6 @@ from PySide6.QtCore import QThread, Signal
 
 
 class SessionUpdateWorker(QThread):
-    # emit(sukses: bool, pesan: str) setelah proses selesai / gagal
     selesai = Signal(bool, str)
 
     def run(self):
@@ -11,7 +10,7 @@ class SessionUpdateWorker(QThread):
             save_auth()
             self.selesai.emit(
                 True,
-                "Sesi login berhasil diperbarui dan disimpan ke auth_state.json."
+                "Sesi login berhasil diperbarui."
             )
         except Exception as e:
             self.selesai.emit(False, f"Gagal memperbarui sesi login:\n{e}")

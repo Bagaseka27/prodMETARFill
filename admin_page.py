@@ -396,7 +396,13 @@ class AdminApp(QMainWindow):
         jenis = "success" if sukses else "error"
         self.tampilkan_pesan(judul, pesan, jenis=jenis)
 
-    def tampilkan_pesan(self, judul, pesan, jenis="info"):
+    def tampilkan_pesan(self, judul, pesan, jenis="info", buttons=QMessageBox.StandardButton.Ok):
+        """Dialog pesan terpusat untuk semua notifikasi CRUD (info/success/
+        warning/error/question). Sebelumnya sebagian pesan CRUD memakai
+        QMessageBox.warning/critical/question langsung tanpa stylesheet,
+        sehingga warna teks ikut tema OS (putih & samar saat dark mode).
+        Sekarang semua memakai method ini agar teksnya konsisten hitam di
+        atas latar terang."""
         msg = QMessageBox(self)
         msg.setWindowTitle(judul)
         msg.setText(pesan)
@@ -406,14 +412,23 @@ class AdminApp(QMainWindow):
             msg.setIcon(QMessageBox.Warning)
         elif jenis == "error":
             msg.setIcon(QMessageBox.Critical)
+        elif jenis == "question":
+            msg.setIcon(QMessageBox.Question)
         else:
             msg.setIcon(QMessageBox.Information)
-        msg.setStyleSheet("QLabel{color: black;} QPushButton{color: black;}")
-        msg.exec()
+        msg.setStandardButtons(buttons)
+        msg.setStyleSheet("""
+            QMessageBox { background-color: #FFFFFF; }
+            QLabel { color: #000000; background-color: transparent; }
+            QPushButton {
+                color: #000000; background-color: #F0F4F8;
+                border: 1px solid #A0A0A0; border-radius: 4px; padding: 5px 14px;
+            }
+            QPushButton:hover { background-color: #E0E6EA; }
+        """)
+        return msg.exec()
 
-    # ---------------------------------------------------------------
-    # CRUD - terhubung langsung ke database_metar.db (tabel Users)
-    # ---------------------------------------------------------------
+
     def get_connection(self):
         return sqlite3.connect(get_db_path())
 
@@ -426,11 +441,10 @@ class AdminApp(QMainWindow):
         return [{"id_user": r[0], "nama": r[1], "role": r[2]} for r in rows]
 
     def load_table_data(self):
-        """Mengambil data terbaru dari database dan merender ke QTableWidget"""
         try:
             users = self.fetch_users()
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Kesalahan Database", f"Gagal membaca data pengguna:\n{e}")
+            self.tampilkan_pesan("Kesalahan Database", f"Gagal membaca data pengguna:\n{e}", jenis="error")
             return
 
         self.table.setRowCount(0)
@@ -464,13 +478,12 @@ class AdminApp(QMainWindow):
             self.table.setCellWidget(row_idx, 3, action_widget)
 
     def open_modal(self, title, user_data=None):
-        """Fungsi pembuka pop-up form Tambah/Edit, langsung menulis ke database"""
         dialog = UserModal(title, self, user_data)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             res = dialog.get_data()
 
             if not res["nama"] or (not user_data and not res["pass"]):
-                QMessageBox.warning(self, "Peringatan", "Nama dan password wajib diisi!")
+                self.tampilkan_pesan("Peringatan", "Nama dan password wajib diisi!", jenis="warning")
                 return
 
             try:
@@ -497,22 +510,23 @@ class AdminApp(QMainWindow):
                 conn.commit()
                 conn.close()
             except sqlite3.IntegrityError:
-                QMessageBox.warning(self, "Peringatan", f"Nama pengguna '{res['nama']}' sudah digunakan!")
+                self.tampilkan_pesan("Peringatan", f"Nama pengguna '{res['nama']}' sudah digunakan!", jenis="warning")
                 return
             except sqlite3.Error as e:
-                QMessageBox.critical(self, "Kesalahan Database", f"Gagal menyimpan data:\n{e}")
+                self.tampilkan_pesan("Kesalahan Database", f"Gagal menyimpan data:\n{e}", jenis="error")
                 return
 
             self.load_table_data()  # Refresh tabel
 
     def delete_user(self, user):
         if self.user_data.get("id_user") == user["id_user"]:
-            QMessageBox.warning(self, "Peringatan", "Tidak bisa menghapus akun yang sedang login!")
+            self.tampilkan_pesan("Peringatan", "Tidak bisa menghapus akun yang sedang login!", jenis="warning")
             return
 
-        confirm = QMessageBox.question(
-            self, "Konfirmasi", f"Hapus user #{user['id_user']} ({user['nama']})?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        confirm = self.tampilkan_pesan(
+            "Konfirmasi", f"Hapus user #{user['id_user']} ({user['nama']})?",
+            jenis="question",
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if confirm == QMessageBox.StandardButton.Yes:
             try:
@@ -522,7 +536,7 @@ class AdminApp(QMainWindow):
                 conn.commit()
                 conn.close()
             except sqlite3.Error as e:
-                QMessageBox.critical(self, "Kesalahan Database", f"Gagal menghapus data:\n{e}")
+                self.tampilkan_pesan("Kesalahan Database", f"Gagal menghapus data:\n{e}", jenis="error")
                 return
             self.load_table_data()
 

@@ -600,9 +600,7 @@ class DashboardApp(QMainWindow):
         elif ringkasan["baru"] > 0:
             self.tampilkan_pesan(
                 "Berhasil",
-                f"{ringkasan['baru']} data METAR baru berhasil disimpan untuk tanggal {label_tanggal}.\n"
-                f"({ringkasan['sudah_ada']} sudah ada sebelumnya, "
-                f"{ringkasan['gagal_parse']} gagal diparsing.)",
+                f"{ringkasan['baru']} data METAR baru berhasil disimpan untuk tanggal {label_tanggal}.\n",
                 jenis="success",
             )
         else:
