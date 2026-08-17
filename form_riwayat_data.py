@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QFrame, QTableWidget, QTableWidgetItem, 
     QHeaderView, QButtonGroup, QAbstractItemView, QLineEdit, QMessageBox,
-    QComboBox, QDateEdit
+    QComboBox, QDateEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, QSize, QDate
 from PySide6.QtGui import QPixmap, QFont
@@ -192,6 +192,11 @@ class RiwayatApp(QMainWindow):
                 selection-background-color: #0070C0;
                 selection-color: white;
             }
+            QCheckBox {
+                color: #333333;
+                font-size: 11px;
+                background: transparent;
+            }
             QPushButton {
                 background-color: #0070C0;
                 color: white;
@@ -217,12 +222,20 @@ class RiwayatApp(QMainWindow):
 
         # Date Picker Tanggal Pengisian
         date_box = QVBoxLayout()
-        date_box.addWidget(QLabel("Tanggal Pengisian"))
+        date_header = QHBoxLayout()
+        date_header.addWidget(QLabel("Tanggal Pengisian"))
+        self.chk_filter_tanggal = QCheckBox("Aktifkan")
+        self.chk_filter_tanggal.setChecked(False)
+        date_header.addWidget(self.chk_filter_tanggal)
+        date_header.addStretch()
+        date_box.addLayout(date_header)
 
         self.input_filter_tanggal = QDateEdit()
         self.input_filter_tanggal.setCalendarPopup(True)
         self.input_filter_tanggal.setDisplayFormat("yyyy-MM-dd")
         self.input_filter_tanggal.setDate(QDate.currentDate())
+        self.input_filter_tanggal.setEnabled(False)
+        self.chk_filter_tanggal.toggled.connect(self.input_filter_tanggal.setEnabled)
         date_box.addWidget(self.input_filter_tanggal)
         filter_layout.addLayout(date_box, 40)
 
@@ -321,7 +334,9 @@ class RiwayatApp(QMainWindow):
 
     def cari_riwayat(self):
         observer_filter = self.input_filter_observer.currentData()
-        tanggal_filter = self.input_filter_tanggal.date().toString("yyyy-MM-dd")
+        tanggal_filter = None
+        if self.chk_filter_tanggal.isChecked():
+            tanggal_filter = self.input_filter_tanggal.date().toString("yyyy-MM-dd")
 
         self.load_riwayat(observer_filter=observer_filter, tanggal_filter=tanggal_filter)
 
@@ -363,7 +378,17 @@ class RiwayatApp(QMainWindow):
         conn.close()
 
         if not rows and (observer_filter or tanggal_filter):
-            QMessageBox.information(self, "Info", "Tidak ada data yang cocok dengan filter yang dipilih.")
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Info")
+            msg.setIcon(QMessageBox.Information)
+            msg.setText("Tidak ada data yang cocok dengan filter yang dipilih.")
+            msg.setStyleSheet("""
+                QMessageBox { background-color: white; }
+                QLabel { color: black; }
+                QPushButton { color: black; background-color: #E0E0E0; padding: 6px 16px; border-radius: 4px; }
+                QPushButton:hover { background-color: #D0D0D0; }
+            """)
+            msg.exec()
 
         self.populate_riwayat_data(rows)       
 
